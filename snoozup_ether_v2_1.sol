@@ -15,16 +15,16 @@ contract SnzupBeta {
     }
 
     address private owner;
+
     address[] private allowedUsers;
+    ChallengeStatus private status;
+    uint private fee;
+    mapping(address => bool) private whitelistAddress;
+    uint private challengeId;
+    UserSubscription[] private challengeUsers;
     address[] private winnersList;
 
-    uint private fee;
     uint private commission;
-
-    ChallengeStatus private status;
-    UserSubscription[] private challengeUsers;
-
-    mapping(address => bool) private whitelistAddress;
 
     event SubscriptionCreated(address indexed subscriber, uint timestamp);
     event SubscriptionCancelled(address indexed subscriber, uint timestamp);
@@ -181,13 +181,13 @@ contract SnzupBeta {
         return (calculatedCommision, bonus);
     }
 
-    function sendBonusToWinners(
-        address[] memory winners
-    ) external onlyAllowedUsers {
-        (, uint bonus) = calculateCompetitionBonus(winners.length);
+    function sendBonusToWinners() external onlyAllowedUsers {
+        if (winnersList.length > 0) {
+            (, uint bonus) = calculateCompetitionBonus(winnersList.length);
 
-        for (uint i = 0; i < winners.length; i++) {
-            payable(winners[i]).transfer(bonus);
+            for (uint i = 0; i < winnersList.length; i++) {
+                payable(winnersList[i]).transfer(bonus);
+            }
         }
     }
 
