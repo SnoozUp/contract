@@ -28,6 +28,13 @@ contract SnzupBeta {
 
     event SubscriptionCreated(address indexed subscriber, uint timestamp);
     event SubscriptionCancelled(address indexed subscriber, uint timestamp);
+    event KeepUpTriggered(uint indexed timestamp);
+    event CommisionAndBonusCalculated(
+        uint indexed commission,
+        uint indexed bonus,
+        uint timestamp
+    );
+    event BonusSent(address indexed subscriber, uint timestamp);
 
     constructor() {
         owner = msg.sender;
@@ -183,10 +190,19 @@ contract SnzupBeta {
 
     function sendBonusToWinners() external onlyAllowedUsers {
         if (winnersList.length > 0) {
-            (, uint bonus) = calculateCompetitionBonus(winnersList.length);
+            emit KeepUpTriggered(block.timestamp);
+            (uint calculatedCommision, uint bonus) = calculateCompetitionBonus(
+                winnersList.length
+            );
+            emit CommisionAndBonusCalculated(
+                calculatedCommision,
+                bonus,
+                block.timestamp
+            );
 
             for (uint i = 0; i < winnersList.length; i++) {
                 payable(winnersList[i]).transfer(bonus);
+                emit BonusSent(winnersList[i], block.timestamp);
             }
         }
     }
