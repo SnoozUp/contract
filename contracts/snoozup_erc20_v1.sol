@@ -128,18 +128,6 @@ contract Snzup {
         return fee;
     }
 
-    // function subscribe() external payable {
-    //     require(!challengeUsers[msg.sender], "User already subscribed");
-    //     require(
-    //         status == ChallengeStatus.PENDING,
-    //         "Challenge is in progress or expired"
-    //     );
-    //     require(msg.value == fee, "Incorrect subscription fee");
-    //     challengeUsers[msg.sender] = true;
-    //     emit SubscriptionCreated(msg.sender, block.timestamp);
-    // }
-
-    // Function to subscribe, payable in USDC
     function subscribe() external {
         require(!challengeUsers[msg.sender], "User already subscribed");
         require(
