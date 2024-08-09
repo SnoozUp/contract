@@ -37,7 +37,6 @@ contract Snzup {
         fee = _fee;
         commission = _commission;
         status = ChallengeStatus.PENDING;
-        // allowedUsers.push(msg.sender);
     }
 
     modifier onlyOwner() {
@@ -58,11 +57,9 @@ contract Snzup {
 
     function setOwner(address user) public onlyOwner {
         whitelistAddress[user] = true;
-        // allowedUsers.push(user);
     }
 
     function isOwner(address user) public view onlyOwner returns (bool) {
-        // return allowedUsers;
         return whitelistAddress[user];
     }
 
