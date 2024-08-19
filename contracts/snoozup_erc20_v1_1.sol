@@ -2,16 +2,9 @@
 
 pragma solidity >=0.8.2 <0.9.0;
 
-interface IERC20 {
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
-}
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 
-contract Snzup {
+contract SnzupErc20 {
     enum ChallengeStatus {
         PENDING,
         INPROGRESS,
@@ -32,7 +25,6 @@ contract Snzup {
 
     event SubscriptionCreated(address indexed subscriber, uint timestamp);
     event SubscriptionCancelled(address indexed subscriber, uint timestamp);
-    event KeepUpTriggered(uint indexed timestamp);
     event CommisionAndBonusCalculated(
         uint indexed commission,
         uint indexed bonus,
@@ -135,46 +127,37 @@ contract Snzup {
             "Challenge is in progress or expired"
         );
         require(
-            erc20Token.balanceOf(msg.sender) >= subscriptionPrice,
+            erc20Token.balanceOf(msg.sender) >= fee,
             "Insufficient balance"
         );
-
         require(
-            erc20Token.transferFrom(
-                msg.sender,
-                address(this),
-                subscriptionPrice
-            ),
+            erc20Token.allowance(msg.sender, address(this)) >= fee,
+            "Insufficient allowance"
+        );
+        require(
+            erc20Token.transferFrom(msg.sender, address(this), fee),
             "erc20 token transfer failed"
         );
 
         challengeUsers[msg.sender] = true;
+
         emit SubscriptionCreated(msg.sender, block.timestamp);
-    }
-
-    function calculateCompetitionBonus(
-        uint winnersCount
-    ) internal view onlyAllowedUsers returns (uint, uint) {
-        uint balance = erc20Token.balanceOf(address(this));
-
-        require(balance > 0, "Insufficient balance");
-
-        uint calculatedCommision = ((balance - operationFee) * commission) /
-            100;
-
-        uint challengeBalance = (balance + operationFee) - calculatedCommision;
-
-        uint bonus = challengeBalance / winnersCount;
-
-        return (calculatedCommision, bonus);
     }
 
     function sendBonusToWinners() external onlyAllowedUsers {
         if (winnersList.length > 0) {
-            emit KeepUpTriggered(block.timestamp);
-            (uint calculatedCommision, uint bonus) = calculateCompetitionBonus(
-                winnersList.length
-            );
+            uint balance = erc20Token.balanceOf(address(this));
+
+            require(balance > 0, "Insufficient balance");
+
+            uint calculatedCommision = ((balance - operationFee) * commission) /
+                100;
+
+            uint challengeBalance = (balance + operationFee) -
+                calculatedCommision;
+
+            uint bonus = challengeBalance / winnersList.length;
+
             emit CommisionAndBonusCalculated(
                 calculatedCommision,
                 bonus,
@@ -182,7 +165,13 @@ contract Snzup {
             );
 
             for (uint i = 0; i < winnersList.length; i++) {
-                usdcToken.transferFrom(address(this), winnersList[i], bonus);
+                require(
+                    erc20Token.approve(winnersList[i], bonus),
+                    "Approval failed"
+                );
+
+                erc20Token.transfer(winnersList[i], bonus);
+
                 emit BonusSent(winnersList[i], block.timestamp);
             }
         }
@@ -190,8 +179,22 @@ contract Snzup {
         status = ChallengeStatus.CLOSED;
     }
 
-    function withdrawFunds() external onlyOwner {
-        usdcToken.transferFrom(
+    function approve(
+        address to,
+        uint amount
+    ) external onlyOwner returns (bool) {
+        return erc20Token.approve(to, amount);
+    }
+
+    function sendBonusTo(
+        address to,
+        uint bonus
+    ) external onlyOwner returns (bool) {
+        return erc20Token.transfer(to, bonus);
+    }
+
+    function withdrawFund() external onlyOwner {
+        erc20Token.transferFrom(
             address(this),
             msg.sender,
             erc20Token.balanceOf(address(this))
