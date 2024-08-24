@@ -4,7 +4,7 @@ pragma solidity >=0.8.2 <0.9.0;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 
-contract SnzupErc20 {
+contract SnoozupChallenge {
     enum ChallengeStatus {
         PENDING,
         INPROGRESS,
@@ -179,25 +179,9 @@ contract SnzupErc20 {
         status = ChallengeStatus.CLOSED;
     }
 
-    function approve(
-        address to,
-        uint amount
-    ) external onlyOwner returns (bool) {
-        return erc20Token.approve(to, amount);
-    }
-
-    function sendBonusTo(
-        address to,
-        uint bonus
-    ) external onlyOwner returns (bool) {
-        return erc20Token.transfer(to, bonus);
-    }
-
     function withdrawFund() external onlyOwner {
-        erc20Token.transferFrom(
-            address(this),
-            msg.sender,
-            erc20Token.balanceOf(address(this))
-        );
+        uint balance = erc20Token.balanceOf(address(this));
+
+        erc20Token.transfer(owner, balance);
     }
 }
