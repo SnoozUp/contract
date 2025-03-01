@@ -20,7 +20,9 @@ contract Snzup {
     uint private commission;
     uint private operationFee = 0;
 
-    event SubscriptionCreated(address indexed subscriber, uint timestamp);
+    uint private _callDepth = 0;
+
+    event SubscriptionCreated(address indexed subscriber,uint indexed value, uint timestamp);
     event SubscriptionCancelled(address indexed subscriber, uint timestamp);
     event KeepUpTriggered(uint indexed timestamp);
     event CommisionAndBonusCalculated(
@@ -29,6 +31,7 @@ contract Snzup {
         uint timestamp
     );
     event BonusSent(address indexed subscriber, uint timestamp);
+    event RefundSent(address indexed subscriber, uint timestamp);
 
     constructor(uint _challengeId, uint _fee, uint _commission) {
         owner = msg.sender;
@@ -120,7 +123,7 @@ contract Snzup {
         );
         require(msg.value == fee, "Incorrect subscription fee");
         challengeUsers[msg.sender] = true;
-        emit SubscriptionCreated(msg.sender, block.timestamp);
+        emit SubscriptionCreated(msg.sender, msg.value, block.timestamp);
     }
 
     function calculateCompetitionBonus(
@@ -140,9 +143,11 @@ contract Snzup {
         return (calculatedCommision, bonus);
     }
 
-    function sendBonusToWinners() external onlyAllowedUsers {
+    function sendBonusToWinners(address snoozupWallet) external onlyAllowedUsers {
+        require(snoozupWallet != address(0), "Invalid snoozupWallet address");
+        require(address(this).balance > 0, "Insufficient contract balance");
+
         if (winnersList.length > 0) {
-            emit KeepUpTriggered(block.timestamp);
             (uint calculatedCommision, uint bonus) = calculateCompetitionBonus(
                 winnersList.length
             );
@@ -153,15 +158,52 @@ contract Snzup {
             );
 
             for (uint i = 0; i < winnersList.length; i++) {
-                payable(winnersList[i]).transfer(bonus);
+                address winner = winnersList[i];
+                require(winner != address(0), "Invalid winner address");
+
+                (bool sendToWinnersSuccess, ) = payable(winner).call{value: bonus}("");
+                    
+                require(sendToWinnersSuccess, "Transfer to winner failed");
                 emit BonusSent(winnersList[i], block.timestamp);
             }
         }
 
+        uint remainingBalance = address(this).balance;
+        require(remainingBalance > 0, "No balance left for snoozup");
+
+        (bool sendToSnoozupSuccess, ) = payable(snoozupWallet).call{value: remainingBalance}("");
+        require(sendToSnoozupSuccess, "Transfer to snoozup wallet failed");
+
         status = ChallengeStatus.CLOSED;
     }
 
+    function refund(address[] calldata subscribers) external onlyOwner {
+        uint totalRefund = fee * subscribers.length;
+
+        require(address(this).balance >= totalRefund, "Insufficient contract balance");
+
+        uint gasBefore = gasleft();
+        for (uint256 i = 0; i < subscribers.length; i++) {
+            address subscriber = subscribers[i];
+
+            require(subscriber != address(0), "Invalid subscriber address");
+            
+            (bool sendToSubscriberSuccess, ) = payable(subscriber).call{value: fee}("");
+
+            require(sendToSubscriberSuccess, "Transfer to subscriber failed");
+
+            challengeUsers[subscriber] = false;
+
+            emit RefundSent(subscriber, block.timestamp);
+        }
+        uint gasAfter = gasleft();
+        operationFee += gasBefore - gasAfter;
+    }
+
     function withdrawFunds() external onlyOwner {
-        payable(msg.sender).transfer(address(this).balance);
+        (bool success, ) = payable(msg.sender).call{
+            value: address(this).balance
+        }("");
+        require(success, "Transfer failed");
     }
 }
