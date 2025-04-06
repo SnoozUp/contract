@@ -1,15 +1,37 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity >=0.8.2 <0.9.0;
+pragma solidity ^0.8.20;
 
 interface IERC20 {
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) external returns (bool);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
+    event Approval(
+        address indexed owner,
+        address indexed spender,
+        uint256 value
+    );
+
+    function totalSupply() external view returns (uint256);
+
     function balanceOf(address account) external view returns (uint256);
+
+    function transfer(address to, uint256 value) external returns (bool);
+
+    function allowance(
+        address owner,
+        address spender
+    ) external view returns (uint256);
+
+    function approve(address spender, uint256 value) external returns (bool);
+
+    function transferFrom(
+        address from,
+        address to,
+        uint256 value
+    ) external returns (bool);
 }
+
+pragma solidity >=0.8.2 <0.9.0;
 
 contract Snzup {
     enum ChallengeStatus {
@@ -32,7 +54,11 @@ contract Snzup {
 
     event SubscriptionCreated(address indexed subscriber, uint timestamp);
     event SubscriptionCancelled(address indexed subscriber, uint timestamp);
-    event KeepUpTriggered(uint indexed timestamp);
+    event CommisionAndBonusCalculation(
+        uint indexed balance,
+        uint indexed challengeBalance,
+        uint timestamp
+    );
     event CommisionAndBonusCalculated(
         uint indexed commission,
         uint indexed bonus,
@@ -136,45 +162,45 @@ contract Snzup {
             "Challenge is in progress or expired"
         );
         require(
-            erc20Token.balanceOf(msg.sender) >= subscriptionPrice,
+            erc20Token.balanceOf(msg.sender) >= fee,
             "Insufficient balance"
         );
-
         require(
-            erc20Token.transferFrom(
-                msg.sender,
-                address(this),
-                subscriptionPrice
-            ),
+            erc20Token.allowance(msg.sender, address(this)) >= fee,
+            "Insufficient allowance"
+        );
+        require(
+            erc20Token.transferFrom(msg.sender, address(this), fee),
             "erc20 token transfer failed"
         );
 
         challengeUsers[msg.sender] = true;
+
         emit SubscriptionCreated(msg.sender, block.timestamp);
     }
 
     function calculateCompetitionBonus(
         uint winnersCount
-    ) internal view onlyAllowedUsers returns (uint, uint) {
+    ) internal onlyAllowedUsers returns (uint, uint) {
         uint balance = erc20Token.balanceOf(address(this));
 
         require(balance > 0, "Insufficient balance");
 
-        uint calculatedCommision = ((balance - operationFee) * commission) /
-            100;
+        uint calculatedCommision = (balance * commission) / 100;
 
-        uint challengeBalance = (balance + operationFee) - calculatedCommision;
+        uint challengeBalance = balance - calculatedCommision;
 
         uint bonus = challengeBalance / winnersCount;
+
+        emit CommisionAndBonusCalculation(
+            balance,
+            challengeBalance,
+            block.timestamp
+        );
 
         return (calculatedCommision, bonus);
     }
 
-<<<<<<<< Updated upstream:contracts/snoozup_erc20_v1.sol
-    function sendBonusToWinners() external onlyAllowedUsers {
-        if (winnersList.length > 0) {
-            emit KeepUpTriggered(block.timestamp);
-========
     function sendBonusToWinners(
         address snoozupWallet
     ) external onlyAllowedUsers {
@@ -185,7 +211,6 @@ contract Snzup {
         );
 
         if (winnersList.length > 0) {
->>>>>>>> Stashed changes:contracts/snoozup_erc20_subscribe_v1_3.sol
             (uint calculatedCommision, uint bonus) = calculateCompetitionBonus(
                 winnersList.length
             );
@@ -196,43 +221,40 @@ contract Snzup {
             );
 
             for (uint i = 0; i < winnersList.length; i++) {
-<<<<<<<< Updated upstream:contracts/snoozup_erc20_v1.sol
-                usdcToken.transferFrom(address(this), winnersList[i], bonus);
-                emit BonusSent(winnersList[i], block.timestamp);
-========
                 address winner = winnersList[i];
                 require(winner != address(0), "Invalid winner address");
 
-                require(erc20Token.approve(winner, bonus), "Approval failed");
+                require(
+                    erc20Token.approve(winner, bonus),
+                    "Approval winner failed"
+                );
 
-                bool success = erc20Token.transfer(winner, bonus);
+                bool winnerTransferSuccess = erc20Token.transfer(winner, bonus);
 
-                require(success, "Transfer to winner failed");
+                require(winnerTransferSuccess, "Transfer to winner failed");
 
                 emit BonusSent(winner, block.timestamp);
->>>>>>>> Stashed changes:contracts/snoozup_erc20_subscribe_v1_3.sol
             }
         }
 
         uint remainingBalance = erc20Token.balanceOf(address(this));
         require(remainingBalance > 0, "No balance left for snoozup");
 
-        (bool sendToSnoozupSuccess, ) = payable(snoozupWallet).call{
-            value: remainingBalance
-        }("");
-        require(sendToSnoozupSuccess, "Transfer to snoozup wallet failed");
+        require(
+            erc20Token.approve(snoozupWallet, remainingBalance),
+            "Approval snoozup wallet failed"
+        );
+
+        bool snoozupTransferSuccess = erc20Token.transfer(
+            snoozupWallet,
+            remainingBalance
+        );
+
+        require(snoozupTransferSuccess, "Transfer to snoozup wallet failed");
 
         status = ChallengeStatus.CLOSED;
     }
 
-<<<<<<<< Updated upstream:contracts/snoozup_erc20_v1.sol
-    function withdrawFunds() external onlyOwner {
-        usdcToken.transferFrom(
-            address(this),
-            msg.sender,
-            erc20Token.balanceOf(address(this))
-        );
-========
     function refund(address[] calldata subscribers) external onlyOwner {
         uint totalRefund = fee * subscribers.length;
 
@@ -265,6 +287,5 @@ contract Snzup {
 
         bool success = erc20Token.transfer(owner, balance);
         require(success, "USDC transfer failed");
->>>>>>>> Stashed changes:contracts/snoozup_erc20_subscribe_v1_3.sol
     }
 }
