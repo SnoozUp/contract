@@ -3,13 +3,10 @@
 pragma solidity ^0.8.20;
 
 interface IERC20 {
+
     event Transfer(address indexed from, address indexed to, uint256 value);
 
-    event Approval(
-        address indexed owner,
-        address indexed spender,
-        uint256 value
-    );
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 
     function totalSupply() external view returns (uint256);
 
@@ -17,23 +14,18 @@ interface IERC20 {
 
     function transfer(address to, uint256 value) external returns (bool);
 
-    function allowance(
-        address owner,
-        address spender
-    ) external view returns (uint256);
+    function allowance(address owner, address spender) external view returns (uint256);
 
     function approve(address spender, uint256 value) external returns (bool);
 
-    function transferFrom(
-        address from,
-        address to,
-        uint256 value
-    ) external returns (bool);
+    function transferFrom(address from, address to, uint256 value) external returns (bool);
 }
+
 
 pragma solidity >=0.8.2 <0.9.0;
 
-contract Snzup {
+
+contract SnzupErc20Subscription {
     enum ChallengeStatus {
         PENDING,
         INPROGRESS,
@@ -120,6 +112,18 @@ contract Snzup {
         return commission;
     }
 
+    function getChallengeId() external view onlyOwner returns (uint) {
+        return challengeId;
+    }
+    
+    function setErc20Adress(address _erc20Address) external onlyOwner {
+        erc20Token = IERC20(_erc20Address);
+    }
+    
+    function getErc20Address() external view onlyOwner returns (address) {
+        return address(erc20Token);
+    }
+
     function changeChallengeStatus(ChallengeStatus _status) external onlyOwner {
         uint gasBefore = gasleft();
 
@@ -155,6 +159,11 @@ contract Snzup {
         return fee;
     }
 
+    function setFee(uint _fee) external onlyOwner {
+        fee = _fee;
+    }
+
+
     function subscribe() external {
         require(!challengeUsers[msg.sender], "User already subscribed");
         require(
@@ -186,7 +195,8 @@ contract Snzup {
 
         require(balance > 0, "Insufficient balance");
 
-        uint calculatedCommision = (balance * commission) / 100;
+        uint calculatedCommision = (balance * commission) /
+            100;
 
         uint challengeBalance = balance - calculatedCommision;
 
@@ -224,10 +234,7 @@ contract Snzup {
                 address winner = winnersList[i];
                 require(winner != address(0), "Invalid winner address");
 
-                require(
-                    erc20Token.approve(winner, bonus),
-                    "Approval winner failed"
-                );
+                require(erc20Token.approve(winner, bonus), "Approval winner failed");
 
                 bool winnerTransferSuccess = erc20Token.transfer(winner, bonus);
 
@@ -240,15 +247,9 @@ contract Snzup {
         uint remainingBalance = erc20Token.balanceOf(address(this));
         require(remainingBalance > 0, "No balance left for snoozup");
 
-        require(
-            erc20Token.approve(snoozupWallet, remainingBalance),
-            "Approval snoozup wallet failed"
-        );
+        require(erc20Token.approve(snoozupWallet, remainingBalance), "Approval snoozup wallet failed");
 
-        bool snoozupTransferSuccess = erc20Token.transfer(
-            snoozupWallet,
-            remainingBalance
-        );
+        bool snoozupTransferSuccess = erc20Token.transfer(snoozupWallet, remainingBalance);
 
         require(snoozupTransferSuccess, "Transfer to snoozup wallet failed");
 
@@ -258,10 +259,7 @@ contract Snzup {
     function refund(address[] calldata subscribers) external onlyOwner {
         uint totalRefund = fee * subscribers.length;
 
-        require(
-            erc20Token.balanceOf(address(this)) >= totalRefund,
-            "Insufficient contract balance"
-        );
+        require(erc20Token.balanceOf(address(this)) >= totalRefund, "Insufficient contract balance");
 
         uint gasBefore = gasleft();
         for (uint256 i = 0; i < subscribers.length; i++) {
