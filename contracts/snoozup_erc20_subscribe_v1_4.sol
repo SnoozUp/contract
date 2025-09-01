@@ -1,3 +1,7 @@
+/**
+ *Submitted for verification at BscScan.com on 2025-07-25
+*/
+
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
@@ -281,9 +285,9 @@ contract SnzupErc20Subscription {
 
     function withdrawFunds() external onlyOwner {
         uint256 balance = erc20Token.balanceOf(address(this));
-        require(balance > 0, "No USDC available");
+        require(balance > 0, "No USDT available");
 
         bool success = erc20Token.transfer(owner, balance);
-        require(success, "USDC transfer failed");
+        require(success, "USDT transfer failed");
     }
 }
